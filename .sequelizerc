@@ -1,0 +1,8 @@
+const path = require('path');
+
+module.exports = {
+  env: process.env.APP_ENV || 'local',
+  config: path.resolve('sequelize-config.js'),
+  'migrations-path': path.resolve('src/database/migrations'),
+  'models-path': path.resolve('src/database/models'),
+};

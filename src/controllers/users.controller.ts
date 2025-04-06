@@ -1,7 +1,7 @@
 import { Request , Response} from "express";
 import { User } from "../database/models/user.model";
 import { Group } from "../database/models/group.model";
-import { Op } from "sequelize";
+import { Op, where } from "sequelize";
 import { ChatMessage } from "../database/models/chat_message.model";
 import { UserFriend } from "../database/models/user_friends.model";
 import { chatTransformer, userTransformer } from "../transformers/user.transformer";
@@ -17,7 +17,7 @@ async function index(req, res){
         {
             list: users.map( (item: User) => {
                 return {
-                    id: item.id,
+                    id: item.userId,
                     name: item.name
                 }
             })
@@ -64,7 +64,7 @@ async function chats(req, res){
         const id = req.params['id'];
         const user = await User.findByPk(id,{
             rejectOnEmpty: true,
-            attributes: ['id', 'name', 'email'],
+            attributes: ['chatId', 'name', 'email'],
             include: [
                 {
                 association: 'Owner',
@@ -72,12 +72,14 @@ async function chats(req, res){
                 include: [
                     {
                     model: ChatMessage,
-                    attributes: ['UserId', 'message', 'createdAt'],
+                    attributes: ['userId', 'message', 'createdAt'],
                     }
                 ]
             }
         ]
         });
+        console.log(user);
+        
         return res.json({user})
     }
     catch(error){
@@ -89,26 +91,28 @@ async function chats(req, res){
 async function userChats(req, res){
     try{
         const user = await getUserFromReq(req);
-
+        
         const chats = await Chat.findAll({
             where:{
-                [Op.or]: [{ ownerId: user.id }, { invitedId: user.id }]
+                [Op.or]: [{ ownerId: user.userId }, { invitedId: user.userId }]
             },
             // include: [ "Owner", "Invited"]
             include: [
-                { model: User, as: "Owner", attributes: ["id", "name"] },
-                { model: User, as: "Invited", attributes: ["id", "name"]}
-            ]
+                { model: User, as: "Owner", attributes: ["userId", "name"] },
+                { model: User, as: "Invited", attributes: ["userId", "name"]},
+                { model: ChatMessage, limit: 1, order: [["chatMessageId", "DESC"]]}
+            ],
         });
 
         const dateChat = chats.map(chat => {
-            const friend = chat.ownerId == user.id ? chat["Invited"] : chat["Owner"];
-
+            const friend = chat.ownerId == user.userId ? chat["Invited"] : chat["Owner"];   
+            
             return {
-                id: chat.id,
+                id: chat.chatId,
                 createdAt: chat.createdAt,
                 status: chat.status,
-                friend: friend ? { id: friend.id, name: friend.name} : null
+                friend: friend ? { id: friend.userId, name: friend.name} : null,
+                msg: chat['ChatMessages'].length ? chat['ChatMessages'][0].message : null
             };
         });
 
@@ -126,24 +130,24 @@ async function friends(req, res){
         const user = await User.findByPk(id, {rejectOnEmpty: true});
         const friends =  await UserFriend.findAll({
             where: {
-                [Op.or]: [{ "userOneId": user.id }, { "userTwoId": user.id }]
+                [Op.or]: [{ "userOneId": user.userId }, { "userTwoId": user.userId }]
             },
             include: ["UserOne", "UserTwo"]
         })
 
         const count = await UserFriend.count({
             where: {
-                [Op.or]: [{ "userOneId": user.id }, { "userTwoId": user.id }]
+                [Op.or]: [{ "userOneId": user.userId }, { "userTwoId": user.userId }]
             }
         });
 
         return res.json({
             user: userTransformer(user), 
             friends: friends.map(userFriend =>{
-                const friend : User = userFriend.userOneId === user.id ? userFriend['UserTwo'] : userFriend['UserOne'];
+                const friend : User = userFriend.userOneId === user.userId ? userFriend['UserTwo'] : userFriend['UserOne'];
                 return {
                     status: userFriend.status,
-                    initByMe: userFriend.userOneId === user.id,
+                    initByMe: userFriend.userOneId === user.userId,
                     ...userTransformer(friend)
                 }
             }), 
@@ -157,9 +161,12 @@ async function friends(req, res){
     }
 }
 
-async function addFriends(req, res){
+async function friendAccept(req, res){
     try{
-        const {userId, friendId } = req.body;
+        // const userId = req.params['userId'];
+        // const friendId = req.params['friendId'];
+
+        const {userId, friendId} = req.params;
 
         const user = await User.findByPk(userId);
         const friend = await User.findByPk(friendId);
@@ -168,26 +175,26 @@ async function addFriends(req, res){
             return res.json({message: "The user or friend does not exist."});
         }
 
-        const checkFriend = await UserFriend.findOne({
+        const checkFriend = await Chat.findOne({
             where: {
                 [Op.or]: [
-                    { userOneId: userId, userTwoId: friendId },
-                    { userOneId: friendId, userTwoId: userId },
+                    { ownerId: userId, invitedId: friendId },
+                    { ownerId: friendId, invitedId: userId },
                 ],
             },
         });
 
-        if(checkFriend){
-            return res.json({message: "The friendship already exists."});
+        if(!checkFriend){
+            return res.json({message: "No pending friend request found."});
         }
 
-        await UserFriend.create({
-            userOneId: userId,
-            userTwoId: friendId,
-            status: 1
-        });
+        checkFriend.status = 2;
+        await checkFriend.save();
 
-        return res.json({message: "Friend added successfully!"})
+        return res.json({
+            message: "Friend added successfully!",
+            updatedChat: checkFriend
+        })
 
     }catch(error){
         console.log(error);
@@ -197,7 +204,7 @@ async function addFriends(req, res){
 
 async function deleteFriends(req, res){
     try{
-        const {userId, friendId} = req.body;
+        const {userId, friendId} = req.params;
 
         const user = await User.findByPk(userId);
         const friend = await User.findByPk(friendId);
@@ -206,23 +213,19 @@ async function deleteFriends(req, res){
             return res.json({message: "The user or friend does not exist."});
         }
 
-        const checkFriend = await UserFriend.findOne({
+        const checkChat = await Chat.findOne({
             where: {
                 [Op.or]: [
-                    { userOneId: userId, userTwoId: friendId }
+                    { ownerId: userId, invitedId: friendId },
+                    { ownerId: friendId, invitedId: userId },
                 ],
             },
         });
 
-        if(!checkFriend){
-            return res.json({message: "this person is not your friend."});
+        if (checkChat) {
+            await checkChat.destroy();
         }
-
-        await UserFriend.destroy({
-            where: {
-                userTwoId: friendId
-            },
-        });
+        
         return res.json({message: "Friend successfully deleted!"})
 
     }catch(error){
@@ -231,41 +234,5 @@ async function deleteFriends(req, res){
     }
 }
 
-async function  friendAccept(req, res){
-    try{
-        const userId = req.user.id;
-        const friendId = req.params['id'];
-
-        const user = await User.findByPk(userId);
-        const friend = await User.findByPk(friendId);
-        
-        if(!user || !friend){
-            return res.json({message: "The user or friend does not exist."});
-        }
-        
-        const checkFriend = await UserFriend.findOne({
-            where: {
-                [Op.or]: [
-                    { userOneid: friendId, userTwoId: userId}
-                ],
-            },
-        });
-
-        if(!checkFriend ) 
-            {
-            return res.json({
-                message: "The friend request does not exist or you are already friends.",
-            });
-        }
-        checkFriend.status = 2;
-        await checkFriend.save();
-
-        return res.json({ message: "Friendship successfully accepted!"});
-    } catch(error){
-        console.log(error);
-        return res.json({ message: error.message});
-    }
-}
-
-export {index, get, groups, chats, friends, addFriends, deleteFriends, friendAccept, userChats};
+export {index, get, groups, chats, friends, friendAccept, deleteFriends,userChats};
 

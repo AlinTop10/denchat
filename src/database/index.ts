@@ -1,13 +1,18 @@
 import { Sequelize } from 'sequelize';
 
+
 let instance: any = null;
 
   function connect() {
   if (instance != null) {
     return instance;
   }
-  instance = new Sequelize('chat_db', 'root', 'root', {
-    host: 'localhost',
+  instance = new Sequelize(
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD, 
+    {
+    host: process.env.DB_HOST,
     dialect: 'mysql',
     logging: false,
   });

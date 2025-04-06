@@ -3,7 +3,7 @@ import { Chat } from "../database/models/chat.model";
 
 function userTransformer(user: User) {
     return {
-        id: user.id,
+        id: user.userId,
         name: user.name,
         email: user.email
     }
@@ -11,7 +11,7 @@ function userTransformer(user: User) {
 
 function chatTransformer(chat: Chat) {
     return {
-        id: chat.id,
+        id: chat.chatId,
         createdAt: chat.createdAt,
         status: chat.status
     }

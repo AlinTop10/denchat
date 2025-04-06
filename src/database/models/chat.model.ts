@@ -3,19 +3,24 @@ import { instance } from "..";
 import { User } from "./user.model";
 import { ChatMessage } from "./chat_message.model";
 
+enum Status {
+    'new' = 1,
+    'accept' = 2,
+}
 
 class Chat extends Model {
-    declare id: number
+    declare chatId: number
     declare ownerId: number
     declare invitedId: number
+    declare status: Status
     declare createdAt: Date
     declare updateAt: Date
-    declare status: number
+    
 }
 
 Chat.init(
     {
-        id: {
+        chatId: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
             primaryKey: true,
@@ -28,16 +33,19 @@ Chat.init(
             type: DataTypes.INTEGER,
             allowNull: false,
         },
+        status: {
+            type: DataTypes.TINYINT,
+            allowNull: false,
+        },
         createdAt: {
             type: DataTypes.TIME,
         },
         updatedAt: {
             type: DataTypes.TIME,
         },
-        status: {
-            type: DataTypes.INTEGER,
-            defaultValue: 1
-        }
+        deletedAt: {
+            type: DataTypes.TIME,
+        },
     },
     {
         sequelize: instance,
@@ -64,25 +72,30 @@ Chat.init(
 // Chat.hasMany(User,{
 //     as: 'Owner',
 //     sourceKey: 'ownerId',
-//     foreignKey: 'id'
+//     foreignKey: 'userId'
 //   })
 
 //   Chat.hasMany(User,{
 //     as: 'Invited',
 //     sourceKey: 'invitedId',
-//     foreignKey: 'id'
+//     foreignKey: 'userId'
 //   })
 
 Chat.belongsTo(User,{
     as: 'Owner',
-    foreignKey: 'ownerId'
+    foreignKey: 'ownerId',
+    targetKey: 'userId'
   })
 
   Chat.belongsTo(User,{
     as: 'Invited',
-    foreignKey: 'invitedId'
+    foreignKey: 'invitedId',
+    targetKey: 'userId'
   })
 
-Chat.hasMany(ChatMessage)
+Chat.hasMany(ChatMessage,{
+    foreignKey: 'chatId',
+    sourceKey: 'chatId'
+})
 
 export {Chat};

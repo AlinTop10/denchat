@@ -19,7 +19,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Something not entered correctly' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1w' });
+    const token = jwt.sign({ id: user.userId, email: user.email }, JWT_SECRET, { expiresIn: '1w' });
 
     res.json({
       message: 'Logare reușită.',
@@ -59,7 +59,7 @@ const register = async ( req, res) => {
     } catch (error) {
         console.error('Eroare la logare:', error);
         res.status(422).json({ message: error.message });
-      }
+    }
     
 }
 

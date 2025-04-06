@@ -4,6 +4,7 @@ import { User } from "../database/models/user.model";
 import { Op } from "sequelize";
 import { Group } from "../database/models/group.model";
 import { GroupUser } from "../database/models/group_user.model";
+import { Chat } from "../database/models/chat.model";
 
 const PER_PAGE = 10;
 
@@ -12,15 +13,15 @@ async function  getChatMessage(req, res) {
         const chatId = req.params['chatId'];
         const page = req.query['page'] || 1;
         const offset = (page - 1) * PER_PAGE;
-        console.log({page, offset});
+        // console.log({page, offset});
         const message = await ChatMessage.findAll({
-            where: { ChatId: chatId },
-            order: [["id", "DESC"]],
-            attributes: ['message', 'id', 'createdAt'],
+            where: { chatId: chatId },
+            order: [["chatMessageId", "DESC"]],
+            attributes: ['message', 'chatMessageId', 'createdAt'],
             include: [
                 {
                     model: User,
-                    attributes: ["id","name"],
+                    attributes: ["userId","name"],
                 }
             ],
             limit: PER_PAGE,
@@ -54,6 +55,44 @@ async function getMessageInChat(req, res){
         console.log(error);
         return res.json({messages: "is not found"});
     }
+};
+
+async function  addChats(req, res){
+    try{
+        const { userId, friendId } = req.params;
+
+        const user = await User.findByPk(userId);
+        const friend = await User.findByPk(friendId);
+
+        if(!user || !friend){
+            return res.json({message: "The user or friend does not exist."});
+        }
+
+        const checkFriend = await Chat.findOne({
+            where: {
+                [Op.or]: [
+                    { ownerId: userId, invitedId: friendId },
+                    { ownerId: friendId, invitedId: userId },
+                ],
+            },
+        });
+
+        if(checkFriend){
+            return res.json({message: "Acest chat deja egzistă."});
+        }
+
+        const newChats = await Chat.create({
+            ownerId: userId,
+            invitedId: friendId,
+            status: 1
+        });
+
+        res.json({ message: "Chatul este creat" });
+    } catch(error) {
+        console.log(error);
+        res.json({ message: error.message });
+    }
+    
 };
 
 async function deleteGroups(req, res){
@@ -90,7 +129,7 @@ async function  addGroups(req, res){
             name,
             UserId,
         });
-        res.json({ message: "Group creaet" });
+        res.json({ message: "Grup este creat" });
     } catch (error) {
         console.log(error);
         res.json({ message: error.message });
@@ -216,14 +255,19 @@ async function getUserInGroup(req, res) {
     }
 }
 
-async function  sendMessageToGroup(req, res){
+async function  sendMessageToChat(req, res){
     try{
-        const { chatId } = req.params['GroupId'];
+        const { chatId } = req.params;
+
+        // const { chatId } = req.params['GroupId'];
         const { userId , message } = req.body;
+
+        // console.log({userId}) nu primim userul curent
         
-        const chat = await Group.findByPk(chatId);
+        const chat = await Chat.findByPk(chatId);
+        
         if(!chat){
-            return res.json({message: "The group not exists."});
+            return res.json({message: "The chat not exists."});
         }
 
         const user = await User.findByPk(userId);
@@ -232,11 +276,12 @@ async function  sendMessageToGroup(req, res){
         }
 
         const newMessage = await ChatMessage.create({
-            ChatId: chatId,
-            UserId: userId,
+            chatId: chatId,
+            userId: userId,
             message: message,
             status: 1,
         });
+
 
         return res.json({ 
             message: "The message was sent",
@@ -248,4 +293,4 @@ async function  sendMessageToGroup(req, res){
     }
 }// sa se faca o functie asemenea pentru a trimite measaj in group
 
-export {getChatMessage, getMessageInChat, deleteGroups, addGroups, addFriendsInGroup, getUserInGroup, deletedFriendsInGroup, sendMessageToGroup};
+export {getChatMessage, getMessageInChat, deleteGroups, addGroups, addFriendsInGroup, getUserInGroup, deletedFriendsInGroup, sendMessageToChat, addChats};

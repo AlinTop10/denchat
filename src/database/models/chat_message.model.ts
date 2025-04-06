@@ -9,10 +9,10 @@ enum Status {
 }
 
 class ChatMessage extends Model {
-    declare id: number
-    declare ChatId: number
+    declare chatMessageId: number
+    declare chatId: number
     declare message: string
-    declare UserId: number
+    declare userId: number
     declare status: Status
     declare createdAt: Date
     declare updatedAt: Date
@@ -21,19 +21,20 @@ class ChatMessage extends Model {
 
 ChatMessage.init(
     {
-        id: {
+        chatMessageId: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
             primaryKey: true,
         },
-        ChatId: {
+        chatId: {
             type: DataTypes.INTEGER,
+            allowNull: false
         },
         message: {
             type: DataTypes.TEXT,
             allowNull: false,
         },
-        UserId: {
+        userId: {
             type: DataTypes.INTEGER,
         },
         status: {

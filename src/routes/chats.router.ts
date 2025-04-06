@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getChatMessage, getMessageInChat, deleteGroups, addGroups, addFriendsInGroup, getUserInGroup, deletedFriendsInGroup} from "../controllers/chat.controller"; 
+import { getChatMessage, getMessageInChat, deleteGroups, addGroups, addFriendsInGroup, getUserInGroup, deletedFriendsInGroup,  sendMessageToChat, addChats} from "../controllers/chat.controller"; 
 
 const chat = Router();
 
@@ -10,7 +10,8 @@ chat.post("/addGrouop", addGroups);
 chat.get('/friends/:id/:GroupId/addToGroup', addFriendsInGroup);
 chat.get('/:GroupId/getUserInGroup', getUserInGroup);
 chat.get('/friends/:id/:GroupId/deleteFromGroup', deletedFriendsInGroup);
-
+chat.post('/:chatId/sendMessagesToChat', sendMessageToChat)
+chat.get('/addChats/:userId/:friendId', addChats);
 
     export default chat;
 
